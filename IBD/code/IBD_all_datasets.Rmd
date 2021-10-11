@@ -88,19 +88,33 @@ df <- left_join(data.frame(sample_data(ps_all), stringsAsFactors = FALSE), df, b
 df <- subset(df, !is.na(df$Study.sub.group))
 ```
 
-Plot PCA scores
+Plot PCA scores (interactive plot is saved as html)
 
-```{r, plotly=TRUE}
+```{r}
 for (f in c("Cohort", "Study.sub.group")) {
   p <- plot_ly(df, x = ~PC1, y = ~PC2, type = "scatter", mode = "markers", color = ~get(f),
                colors = c("slategrey", "aquamarine2", "khaki", "darkgoldenrod", "brown"),
                marker = list(size = 10, width = 2, line = list(color = "black", width = 2), opacity = 1),
                text = ~filename) %>%
-    layout(title = str_replace_all(f, c("\\.x" = "", "\\.y" = "")),
+    layout(title = f,
            xaxis = list(title = paste0("PC1", " [", round(m$prop_expl_var$X[1]*100, digits = 1), "%]"), size = 18),
            yaxis = list(title = paste0("PC2", " [", round(m$prop_expl_var$X[2]*100, digits = 1), "%]"), size = 18))
-  ggplotly(p) # show plot in notebook
   htmlwidgets::saveWidget(p, file = file.path(params$save_dir, paste0("PCA_food_counts_colorBY_", f, ".html")))
+}
+```
+
+Plot PCA scores (static plot for notebook)
+
+```{r, fig.align='center'}
+for (f in c("Cohort", "Study.sub.group")) {
+  p <- ggscatter(df, x = "PC1", y = "PC2", color = f, alpha = 0.8,
+                 palette = c("slategrey", "aquamarine2", "khaki", "darkgoldenrod", "brown"),
+                 xlab = paste0("PC1", " [", round(m$prop_expl_var$X[1]*100, digits = 1), "%]"),
+                 ylab = paste0("PC2", " [", round(m$prop_expl_var$X[2]*100, digits = 1), "%]")) +
+    theme(axis.text = element_text(size = 7)) +
+    geom_hline(yintercept = 0, lty = 2, size = 0.2) +
+    geom_vline(xintercept = 0, lty = 2, size = 0.2)
+  print(p)
 }
 ```
 
