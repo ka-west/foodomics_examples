@@ -1,0 +1,365 @@
+---
+title: "Global FoodOmics - IBD"
+subtitle: "Foods correlated with disease severity"
+author: "Kiana A West"
+date: "`r Sys.Date()`"
+params:
+  ibd_200: "../data/IBD_200.RDS"
+  ibd_1: "../data/IBD_1.RDS"
+  ibd_biospy: "../data/IBD_biopsy.RDS"
+  ibd_seed: "../data/IBD_seed.RDS"
+  ibd_seed2: "../data/IBD_seed2.RDS"
+  save_dir: "../output/correlations_symptom_severity_foods"
+output: 
+  html_document:
+    toc: true
+    theme: cerulean
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+***  
+To design a diet intervention study for IBD, we wanted to determine which foods are positively or negatively correlated with symptom severity. Foods positively correlated with disease severity (associated with worse symptoms) will be avoided in the diet while foods negatively correlated with disease severity (associated with lesser symptoms) will be increased in the diet. Here we analyzed untargeted metabolomics data from 5 IBD cohorts to find concordant signatures across multiple datasets. Food counts (pseudo diet readouts) were generated from clinical samples according to the following [workflow](https://ccms-ucsd.github.io/GNPSDocumentation/tutorials/rdd/). Within each dataset and for each subgroup (ulcerative colitis and Crohn's disease), associations between foods and severity metrics were calculated using partial least squares (PLS) regression and approximating correlations between pairs of variables based on their projections in latent space.  
+
+***   
+
+Make output directory
+
+```{r}
+if (!dir.exists(params$save_dir)) { system(paste("mkdir", params$save_dir)) }
+```
+
+Load packages
+
+```{r}
+pacman::p_load("phyloseq", "magrittr", "ggpubr", "plotly", "mixOmics", "tidyverse", "UpSetR")
+```
+
+Read in data
+
+```{r read_inputs, eval=FALSE}
+ibd_200 <- readRDS(params$ibd_200)
+ibd_1 <- readRDS(params$ibd_1)
+ibd_seed <- readRDS(params$ibd_seed)
+ibd_biopsy <- readRDS(params$ibd_biospy)
+ibd_seed2 <- readRDS(params$ibd_seed2)
+```
+
+# Food correlations with disease severity
+
+```{r}
+food_corr <- function(obj, meta_vars, filter_dup_host = TRUE, rep_meas = FALSE, s = 194) {
+  res <- NULL
+  ps <- obj$ps
+  # change otu table to L5
+  ps@otu_table <- obj$levels$L5[,-1] %>%
+    set_rownames(obj$levels$L5$filename) %>%
+    otu_table(taxa_are_rows = FALSE)
+  # add ontology as taxonomy
+  hold <- as(ps@tax_table, "matrix") %>%
+    data.frame(stringsAsFactors = FALSE) %>%
+    dplyr::group_by(sample_type_group5) %>%
+    dplyr::summarise(sample_type_group4 = paste(unique(sample_type_group4), collapse = ";"),
+                     sample_type_group3 = paste(unique(sample_type_group3), collapse = ";")) %>%
+    filter(sample_type_group5 %in% taxa_names(ps)) %>%
+    as("matrix")
+  row.names(hold) <- hold[,"sample_type_group5"]
+  ps@tax_table <- tax_table(hold)
+  
+  for (gr in unique(ps@sam_data$Study.sub.group)) {
+    if (!is.na(gr) & gr != "HC") {
+      ps_sub <- subset_samples(ps, Study.sub.group == gr)
+      if (filter_dup_host == TRUE) {
+        ps_sub <- subset_samples(ps_sub, !duplicated(host_subject_id))
+      }
+      ps_sub <- filter_taxa(ps_sub, function(x) {sum(x) > 0}, prune = TRUE)
+      foods <- as(ps_sub@otu_table, "matrix")
+      meta <- data.frame(ps_sub@sam_data, stringsAsFactors = FALSE)
+      meta <- meta[,meta_vars]
+      # remove vars with all NA (some apply to only UC or only CD)
+      keep <- sapply(meta, function(x) {all(is.na(x))})
+      meta <- meta[,keep == FALSE]
+      
+      # CLR transform food data
+      clr_mat <- mixOmics::logratio.transfo(foods,
+                                            offset = 1, logratio = "CLR")
+      
+      # model
+      m <- mixOmics::pls(foods, meta, mode = "regression", ncomp = 2, scale = TRUE,
+                         multilevel = if (rep_meas) {
+                           data.frame(host_subject_id = ps_sub@sam_data$host_subject_id) %>%
+                             set_rownames(sample_names(ps_sub)) %>%
+                             as("matrix")
+                         } else NULL)
+      mixOmics::cim(m, transpose = F, save = "pdf",  
+                    name.save = file.path(params$save_dir, obj$ps@sam_data$Cohort[1], "_", gr, "_PLS_foods_L5"), 
+                    row.cex = 0.5, col.cex = 0.6)
+      
+      # permutation test
+      m_net <- network(m, show.color.key = F, comp = 1:2)
+      m_net_perm <- data.frame(m_net$M) %>%
+        mutate(from = row.names(.)) %>%
+        gather(key = "to", value = "weight", -from)
+      
+      idx <- cbind(matrix(nrow = nrow(m_net_perm), ncol = 1000) %>%
+                     set_colnames(paste0("perm_", 1:1000)))
+      set.seed(s)
+      seeds <- sample(30000, 1000, replace = F)
+      
+      # 1000 permuted models and record variable correlation   
+      for (i in 1:1000) {
+        set.seed(seeds[i])
+        m_perm <- pls(X = foods, scale = TRUE, ncomp = 2,
+                      Y = meta %>%
+                        mutate_all(~sample(., replace = FALSE)) %>%
+                        as.matrix(),
+                      multilevel = if (rep_meas) {
+                        data.frame(host_subject_id = ps_sub@sam_data$host_subject_id) %>%
+                          set_rownames(sample_names(ps_sub)) %>%
+                          as("matrix")
+                      } else NULL)
+        m_net <- network(m_perm, show.color.key = F, comp = 1:2)
+        weight_perm <- data.frame(m_net$M) %>%
+          mutate(from = row.names(.)) %>%
+          gather(key = "to", value = "weight", -from)
+        idx[,i] <- weight_perm$weight
+      }
+      
+      idx <- subset(idx, m_net_perm$weight != 0)
+      m_net_perm <- filter(m_net_perm, weight != 0)
+      m_net_perm$pval <- NA
+      
+      # calculate p value for each correlation
+      for (i in 1:nrow(m_net_perm)) {
+        if(m_net_perm$weight[i] < 0) {
+          m_net_perm$pval[i] <- (sum(idx[i,] < m_net_perm$weight[i]) + 1) / (ncol(idx) + 1)
+        } else if (m_net_perm$weight[i] > 0) {
+          m_net_perm$pval[i] <- (sum(idx[i,] > m_net_perm$weight[i]) + 1) / (ncol(idx) + 1)
+        }
+      }
+      m_net_perm$padj <- p.adjust(m_net_perm$pval, method = "BH")
+      
+      m_net_cs <- m_net_perm %>%
+        mutate(direction = case_when(weight < 0 ~ "neg",
+                                     weight > 0 ~ "pos"),
+               padj_sig = ifelse(padj < 0.05, "SIG", "NS"),
+               Group = gr,
+               Cohort = obj$ps@sam_data$Cohort[1])
+      res <- rbind(res, m_net_cs)
+    }
+  }
+  return(res)
+}
+```
+
+## IBD_1
+
+```{r, eval=FALSE}
+meta_vars <- c("shannon", "faith_pd", "Stool.Frequency", "Rectal.Bleeding", "PGA", "Partial.Mayo",
+               "Relative.Activity.Index", "Mayo.Endoscopic.Score", "UCEIS_endoscopic_score", "histologic_remission",
+               "Calprotectin")
+ibd_1_res <- food_corr(ibd_1, meta_vars, s = 923)
+write_csv(ibd_1_res, file.path(params$save_dir, "IBD_1_PLS_foods_L5_correlation.csv"))
+```
+
+## IBD_200
+
+```{r, eval=FALSE}
+meta_vars <- c("CRP.value", "Relative.Activity", "faith.pd", "shannon", "SES.CD.Score", "Mayo.Endoscopic.Score",
+               "UCEIS.Endoscopic.Score", "Stool.Frequency",	"Rectal.Bleeding")
+ibd_200_res <- food_corr(ibd_200, meta_vars, s = 63)
+write_csv(ibd_200_res, file.path(params$save_dir, "IBD_200_PLS_foods_L5_correlation_v2.csv"))
+```
+
+## IBD_biopsy
+
+```{r, eval=FALSE}
+# account for repeated sampling
+meta_vars <- c("overall_endsocopic_disease_activity_score", "segmental_mayo_score",	"segmental_ses_cd_score",	"ses_cd_avg_per_segment",
+               "total_ses_cd_score", "mayo_uc_score",	"montreal_cd_score", "extent_of_uc_score")
+ibd_biopsy_res <- food_corr(ibd_biopsy, meta_vars, s = 527, filter_dup_host = FALSE, rep_meas = TRUE)
+write_csv(ibd_biopsy_res, file.path(params$save_dir, "IBD_biopsy_PLS_foods_L5_correlation.csv"))
+```
+
+## IBD_seed
+
+```{r, eval=FALSE}
+meta_vars <- c("bowel_movements_daily", "mayo_endo_score", "simple_endoscopic_score_crohns_disease", "symptoms",
+               "endoscopic_activity",	"endoscopic_disease_activity", "physician_global_assessment")
+# convert categorical variables to numeric
+ibd_seed$ps@sam_data$symptoms <- gsub("inactive", 0, ibd_seed$ps@sam_data$symptoms)
+ibd_seed$ps@sam_data$symptoms <- gsub("active", 1, ibd_seed$ps@sam_data$symptoms)
+ibd_seed$ps@sam_data$symptoms <- as.numeric(ibd_seed$ps@sam_data$symptoms)
+ibd_seed$ps@sam_data$endoscopic_activity <- gsub("inactive", 0, ibd_seed$ps@sam_data$endoscopic_activity)
+ibd_seed$ps@sam_data$endoscopic_activity <- gsub("active", 1, ibd_seed$ps@sam_data$endoscopic_activity)
+ibd_seed$ps@sam_data$endoscopic_activity <- as.numeric(ibd_seed$ps@sam_data$endoscopic_activity)
+ibd_seed$ps@sam_data$endoscopic_disease_activity <- gsub("remission", 0, ibd_seed$ps@sam_data$endoscopic_disease_activity)
+ibd_seed$ps@sam_data$endoscopic_disease_activity <- gsub("mild", 1, ibd_seed$ps@sam_data$endoscopic_disease_activity)
+ibd_seed$ps@sam_data$endoscopic_disease_activity <- gsub("moderate", 2, ibd_seed$ps@sam_data$endoscopic_disease_activity)
+ibd_seed$ps@sam_data$endoscopic_disease_activity <- gsub("severe", 3, ibd_seed$ps@sam_data$endoscopic_disease_activity)
+ibd_seed$ps@sam_data$endoscopic_disease_activity <- as.numeric(ibd_seed$ps@sam_data$endoscopic_disease_activity)
+
+ibd_seed_res <- food_corr(ibd_seed, meta_vars, s = 1143, filter_dup_host = TRUE, rep_meas = FALSE)
+write_csv(ibd_seed_res, file.path(params$save_dir, "IBD_seed_PLS_foods_L5_correlation.csv"))
+```
+
+## IBD_seed2
+
+```{r, eval=FALSE}
+meta_vars <- c("symptoms", "endoscopic_activity", "endoscopic_activity_integer", 
+               "Mayo_endoscopy_score", "SESCD", "uceis", "histologic_endoscopic_remission", 
+               "histologic_activity", "sescd_summary", "rectal_bleeding", "bowel_movements")
+# convert categorical variables to numeric
+ibd_seed2$ps@sam_data$symptoms <- as.numeric(gsub("inactive", 0, ibd_seed2$ps@sam_data$symptoms, ignore.case = T))
+ibd_seed2$ps@sam_data$symptoms <- as.numeric(gsub("active", 1, ibd_seed2$ps@sam_data$symptoms, ignore.case = T))
+ibd_seed2$ps@sam_data$endoscopic_activity <- as.numeric(gsub("inactive", 0, ibd_seed2$ps@sam_data$endoscopic_activity, ignore.case = T))
+ibd_seed2$ps@sam_data$endoscopic_activity <- as.numeric(gsub("active", 1, ibd_seed2$ps@sam_data$endoscopic_activity, ignore.case = T))
+ibd_seed2$ps@sam_data$bowel_movements <- as.numeric(ibd_seed2$ps@sam_data$bowel_movements)
+
+ibd_seed2_res <- food_corr(ibd_seed2, meta_vars, s = 1143, filter_dup_host = TRUE, rep_meas = FALSE)
+write_csv(ibd_seed2_res, file.path(params$save_dir, "IBD_seed2_PLS_foods_L5_correlation.csv"))
+```
+
+# Plot all results
+
+Read in results
+
+```{r, message=FALSE}
+res <- read_csv(file.path(params$save_dir, "IBD_1_PLS_foods_L5_correlation.csv")) %>%
+  bind_rows(read_csv(file.path(params$save_dir, "IBD_200_PLS_foods_L5_correlation_v2.csv"))) %>%
+  bind_rows(read_csv(file.path(params$save_dir, "IBD_seed_PLS_foods_L5_correlation.csv"))) %>%
+  bind_rows(read_csv(file.path(params$save_dir, "IBD_biopsy_PLS_foods_L5_correlation.csv"))) %>%
+  bind_rows(read_csv(file.path(params$save_dir, "IBD_seed2_PLS_foods_L5_correlation.csv")))
+```
+
+Fix variables to match across cohorts
+
+```{r}
+res_sub <- res %>%
+  mutate(clinical = str_replace_all(to, c("faith_pd" = "faith.pd", "mayo_endo_score" = "Mayo.Endoscopic.Score",
+                                          "mayo_uc_score" = "Mayo.Endoscopic.Score", "Relative.Activity.Index" = "Relative.Activity",
+                                           "total_ses_cd_score" = "SES.CD.Score",
+                                          "ses_cd_avg_per_segment" = "segmental_ses_cd_score", 
+                                          "simple_endoscopic_score_crohns_disease" = "SES.CD.Score",
+                                          "Mayo_endoscopy_score" = "Mayo.Endoscopic.Score", "SESCD" = "SES.CD.Score", 
+                                          "UCEIS" = "UCEIS.Endoscopic.Score", "uceis" = "UCEIS.Endoscopic.Score", 
+                                          "UCEIS_endoscopic_score" = "UCEIS.Endoscopic.Score",
+                                          "rectal_bleeding" = "Rectal.Bleeding", "bowel_movements" = "Stool.Frequency",
+                                          "Stool.Frequency_daily" = "Stool.Frequency")))
+```
+
+Generate Sankey plots (excluding biopsy dataset)
+
+```{r}
+plot_sankey <- function(res_sub, gr, meta_var, save_name, plot_height = 600, plot_width = 600) {
+  to_plot <- res_sub %>%
+    filter(Group %in% gr,
+           Cohort != "IBD_biopsy",
+           clinical %in% meta_var) %>%
+    mutate(from = str_replace(from, "_", " ")) %>%
+    group_by(from, clinical) %>%
+    summarise(direction = paste0(unique(direction), collapse = " ; "),
+              weight = n(),
+              sig = sum(padj_sig == "SIG")) %>%
+    filter(!grepl(";", direction) & sig > 0) # only keep foods significant in at least one dataset with the same direction across multiple
+  
+  nodes <- data.frame(node = 0:(n_distinct(c(to_plot$from, to_plot$clinical))-1),
+                      name = unique(c(to_plot$from, to_plot$clinical)),
+                      group = c(rep("food", n_distinct(to_plot$from)), rep("clinical", n_distinct(to_plot$clinical))),
+                      stringsAsFactors = FALSE)
+  
+  # link negative foods to clinical and clinical to positive foods
+  links <- bind_rows(to_plot %>%
+                       filter(direction == "neg") %>%
+                       left_join(nodes, by = c("from" = "name")) %>%
+                       left_join(nodes, by = c("clinical" = "name")),
+                     to_plot %>%
+                       filter(direction == "pos") %>%
+                       left_join(nodes, by = c("clinical" = "name")) %>%
+                       left_join(nodes, by = c("from" = "name")))
+  
+  if (all(links$direction == "pos")) { # all positive correlations, remove blue ribbons
+    colors <- "d3.rgb(255,0,0,0.3), d3.rgb(255,165,0,0.9), d3.rgb(34,139,34,0.9)"
+  } else if (all(links$direction == "neg")) { # all negative correlations, remove red ribbons
+    colors <- "d3.rgb(65,105,225,0.3), d3.rgb(255,165,0,0.9), d3.rgb(34,139,34,0.9)"
+  } else {
+    colors <- "d3.rgb(65,105,225,0.3), d3.rgb(255,0,0,0.3), d3.rgb(255,165,0,0.9), d3.rgb(34,139,34,0.9)"
+  }
+  colorJS <- paste0('d3.scaleOrdinal([', colors, '])')
+  
+  p <- networkD3::sankeyNetwork(Links = links, Nodes = nodes, 
+                                Source = "node.x", 
+                                Target = "node.y", 
+                                Value = "weight", 
+                                NodeID = "name",
+                                LinkGroup = "direction", 
+                                NodeGroup = "group",
+                                fontSize = 13, 
+                                colourScale = colorJS, 
+                                height = plot_height,
+                                width = plot_width)
+  htmlwidgets::saveWidget(p, file = file.path(params$save_dir, paste0(save_name, "_sankey_food_clin_PLS_corr.html")))
+  write_csv(to_plot, file.path(params$save_dir, paste0(save_name, "_sankey_food_clin_PLS_corr.csv")))
+}
+```
+
+Plot for each clinical variable (each plot saved as html file along with a csv file of tabulated values)
+
+```{r, message=FALSE}
+plot_sankey(res_sub, gr = "UC", meta_var = "Mayo.Endoscopic.Score", 
+            save_name = "UC_mayo")
+plot_sankey(res_sub, gr = "UC", meta_var = "Relative.Activity", 
+            save_name = "UC_rel_act", plot_height = 1500)
+plot_sankey(res_sub, gr = "CD", meta_var = "Relative.Activity", 
+            save_name = "CD_rel_act")
+plot_sankey(res_sub, gr = "CD", meta_var = c("shannon", "faith.pd"), 
+            save_name = "CD_adiv")
+plot_sankey(res_sub, gr = "UC", meta_var = c("shannon", "faith.pd"), 
+            save_name = "UC_adiv", plot_height = 1500)
+plot_sankey(res_sub, gr = "CD", meta_var = c("SES.CD.Score"), 
+            save_name = "CD_SES", plot_height = 1500, plot_width = 1500)
+plot_sankey(res_sub, gr = "UC", meta_var = c("UCEIS.Endoscopic.Score"), 
+            save_name = "UC_UCEIS", plot_height = 600, plot_width = 600)
+plot_sankey(res_sub, gr = "UC", meta_var = c("Stool.Frequency", "Rectal.Bleeding"), 
+            save_name = "UC_mayo_sub_scores", plot_height = 1500, plot_width = 1500)
+```
+
+# Foods associated with disease severity in both UC and CD
+
+```{r, message=FALSE}
+SES <- read_csv(file.path(params$save_dir, "CD_SES_sankey_food_clin_PLS_corr.csv"))
+UCEIS <- read_csv(file.path(params$save_dir, "UC_UCEIS_sankey_food_clin_PLS_corr.csv"))
+Mayo <- read_csv(file.path(params$save_dir, "UC_mayo_sub_scores_sankey_food_clin_PLS_corr.csv")) %>%
+  bind_rows(read_csv(file.path(params$save_dir, "UC_mayo_sankey_food_clin_PLS_corr.csv"))) %>%
+  group_by(from, direction) %>%
+  summarise(clinical = "UC_Mayo")
+
+sets <- list(SES_pos = SES$from[SES$direction == "pos"],
+             UCEIS_pos = UCEIS$from[UCEIS$direction == "pos"],
+             UCEIS_neg = UCEIS$from[UCEIS$direction == "neg"],
+             Mayo_pos = Mayo$from[Mayo$direction == "pos"],
+             Mayo_neg = Mayo$from[Mayo$direction == "neg"])
+```
+
+```{r, fig.align='center'}
+upset(fromList(sets), order.by = "freq")
+```
+
+Get intersected foods (positively associated with disease severity in both UC - Mayo and CD - SES)
+
+```{r}
+names(which(table(c(sets$SES_pos, sets$Mayo_pos)) == 2))
+```
+
+# Session Info
+
+```{r, echo=FALSE}
+sessionInfo()
+```
+

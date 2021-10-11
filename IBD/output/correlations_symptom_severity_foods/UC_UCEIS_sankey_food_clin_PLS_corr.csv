@@ -1,0 +1,12 @@
+from,clinical,direction,weight,sig
+bison,UCEIS.Endoscopic.Score,neg,1,1
+cardamom,UCEIS.Endoscopic.Score,neg,1,1
+cilantro,UCEIS.Endoscopic.Score,neg,1,1
+dragonfruit,UCEIS.Endoscopic.Score,neg,1,1
+eggplant,UCEIS.Endoscopic.Score,neg,1,1
+feta cheese,UCEIS.Endoscopic.Score,neg,1,1
+milk cow,UCEIS.Endoscopic.Score,pos,1,1
+pear,UCEIS.Endoscopic.Score,neg,1,1
+rabbit,UCEIS.Endoscopic.Score,neg,1,1
+salmon,UCEIS.Endoscopic.Score,neg,1,1
+sumac,UCEIS.Endoscopic.Score,neg,1,1

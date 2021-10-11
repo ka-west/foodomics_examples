@@ -1,0 +1,29 @@
+from,clinical,direction,weight,sig
+algae,Mayo.Endoscopic.Score,neg,1,1
+avocado,Mayo.Endoscopic.Score,pos,3,1
+betel nut,Mayo.Endoscopic.Score,neg,2,1
+cardamom,Mayo.Endoscopic.Score,neg,2,1
+carrot,Mayo.Endoscopic.Score,pos,3,1
+cashew,Mayo.Endoscopic.Score,pos,2,1
+chicken,Mayo.Endoscopic.Score,pos,3,1
+cinnamon,Mayo.Endoscopic.Score,neg,2,1
+clementine,Mayo.Endoscopic.Score,neg,2,1
+cod,Mayo.Endoscopic.Score,neg,1,1
+dragonfruit,Mayo.Endoscopic.Score,neg,1,1
+duck,Mayo.Endoscopic.Score,pos,2,1
+egg chicken,Mayo.Endoscopic.Score,pos,3,1
+feta cheese,Mayo.Endoscopic.Score,neg,2,2
+langostino,Mayo.Endoscopic.Score,pos,2,1
+milk,Mayo.Endoscopic.Score,pos,3,1
+milk cow,Mayo.Endoscopic.Score,pos,3,2
+olive,Mayo.Endoscopic.Score,neg,2,1
+onion,Mayo.Endoscopic.Score,pos,3,1
+orange,Mayo.Endoscopic.Score,pos,3,1
+pear,Mayo.Endoscopic.Score,neg,3,2
+pig,Mayo.Endoscopic.Score,pos,3,1
+plum,Mayo.Endoscopic.Score,neg,1,1
+pumpkin blossom,Mayo.Endoscopic.Score,neg,1,1
+rosemary,Mayo.Endoscopic.Score,neg,2,1
+spice,Mayo.Endoscopic.Score,neg,2,2
+sumac,Mayo.Endoscopic.Score,neg,1,1
+veal,Mayo.Endoscopic.Score,pos,2,1

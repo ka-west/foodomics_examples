@@ -1,0 +1,80 @@
+from,clinical,direction,weight,sig
+almond,SES.CD.Score,pos,1,1
+artichoke,SES.CD.Score,pos,1,1
+banana,SES.CD.Score,pos,1,1
+basil,SES.CD.Score,pos,1,1
+bean,SES.CD.Score,pos,2,1
+beef,SES.CD.Score,pos,2,1
+butter,SES.CD.Score,pos,1,1
+butterfish,SES.CD.Score,pos,2,1
+cabbage,SES.CD.Score,pos,1,1
+carrot,SES.CD.Score,pos,2,1
+cashew,SES.CD.Score,pos,1,1
+cauliflower,SES.CD.Score,pos,1,1
+celery,SES.CD.Score,pos,1,1
+chard,SES.CD.Score,pos,1,1
+cheddar cheese,SES.CD.Score,pos,2,1
+chia,SES.CD.Score,pos,1,1
+chicken,SES.CD.Score,pos,2,1
+cilantro,SES.CD.Score,pos,1,1
+coconut,SES.CD.Score,pos,1,1
+corn,SES.CD.Score,pos,2,1
+cream,SES.CD.Score,pos,1,1
+cucumber,SES.CD.Score,pos,2,1
+egg chicken,SES.CD.Score,pos,2,1
+eggplant,SES.CD.Score,pos,1,1
+fig,SES.CD.Score,pos,1,1
+fish undetermined,SES.CD.Score,pos,1,1
+garlic,SES.CD.Score,pos,1,1
+herring,SES.CD.Score,pos,2,1
+kale,SES.CD.Score,pos,1,1
+lamb,SES.CD.Score,pos,1,1
+lemon,SES.CD.Score,pos,2,1
+lentil,SES.CD.Score,pos,2,1
+lizard,SES.CD.Score,pos,1,1
+mackerel,SES.CD.Score,pos,2,1
+mandarin,SES.CD.Score,pos,2,1
+mango,SES.CD.Score,pos,1,1
+meat undetermined,SES.CD.Score,pos,1,1
+melon,SES.CD.Score,pos,1,1
+milk,SES.CD.Score,pos,2,1
+milk cow,SES.CD.Score,pos,2,1
+milk goat,SES.CD.Score,pos,1,1
+mouse,SES.CD.Score,pos,2,1
+mushroom,SES.CD.Score,pos,1,1
+oat,SES.CD.Score,pos,2,1
+onion,SES.CD.Score,pos,2,1
+orange,SES.CD.Score,pos,2,1
+oregano,SES.CD.Score,pos,1,1
+parsley,SES.CD.Score,pos,1,1
+passionfruit,SES.CD.Score,pos,1,1
+pea,SES.CD.Score,pos,1,1
+peach,SES.CD.Score,pos,1,1
+peanut,SES.CD.Score,pos,1,1
+pepper,SES.CD.Score,pos,2,1
+pig,SES.CD.Score,pos,2,1
+pine nut,SES.CD.Score,pos,1,1
+plantain,SES.CD.Score,pos,1,1
+quinoa,SES.CD.Score,pos,2,1
+raspberry,SES.CD.Score,pos,1,1
+rice,SES.CD.Score,pos,2,1
+rosemary,SES.CD.Score,pos,1,1
+salmon,SES.CD.Score,pos,1,1
+sardine,SES.CD.Score,pos,1,1
+sesame,SES.CD.Score,pos,1,1
+shrimp,SES.CD.Score,pos,1,1
+silversides,SES.CD.Score,pos,2,1
+smelt,SES.CD.Score,pos,2,1
+spinach,SES.CD.Score,pos,1,1
+squash,SES.CD.Score,pos,1,1
+squid,SES.CD.Score,pos,2,1
+strawberry,SES.CD.Score,pos,2,1
+sunflower,SES.CD.Score,pos,1,1
+sweet potato,SES.CD.Score,pos,1,1
+tomato,SES.CD.Score,pos,2,1
+trout,SES.CD.Score,pos,2,1
+turkey,SES.CD.Score,pos,1,1
+veal,SES.CD.Score,pos,1,1
+walnut,SES.CD.Score,pos,1,1
+wheat,SES.CD.Score,pos,2,1
+worm,SES.CD.Score,pos,2,1

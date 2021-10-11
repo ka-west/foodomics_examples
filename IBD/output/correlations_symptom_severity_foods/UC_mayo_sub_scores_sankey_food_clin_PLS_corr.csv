@@ -1,0 +1,120 @@
+from,clinical,direction,weight,sig
+algae,Rectal.Bleeding,neg,1,1
+almond,Stool.Frequency,pos,3,1
+amaranth,Stool.Frequency,pos,1,1
+apple,Stool.Frequency,pos,3,1
+avocado,Rectal.Bleeding,pos,2,1
+banana,Stool.Frequency,pos,3,1
+barley,Stool.Frequency,pos,1,1
+bean,Rectal.Bleeding,pos,2,1
+bean,Stool.Frequency,pos,3,1
+beef,Rectal.Bleeding,pos,2,1
+beef,Stool.Frequency,pos,3,1
+betel nut,Rectal.Bleeding,neg,2,1
+buckwheat,Stool.Frequency,pos,1,1
+butter,Stool.Frequency,pos,2,1
+butterfish,Rectal.Bleeding,pos,2,1
+butterfish,Stool.Frequency,pos,3,1
+cardamom,Rectal.Bleeding,neg,2,1
+carrot,Rectal.Bleeding,pos,2,1
+carrot,Stool.Frequency,pos,3,1
+cashew,Stool.Frequency,pos,2,1
+celery,Stool.Frequency,pos,2,1
+chard,Stool.Frequency,pos,2,1
+chicken,Rectal.Bleeding,pos,2,1
+chicken,Stool.Frequency,pos,3,1
+cicerchia,Stool.Frequency,pos,1,1
+cinnamon,Rectal.Bleeding,neg,2,1
+clementine,Rectal.Bleeding,neg,2,1
+cod,Rectal.Bleeding,neg,1,1
+coffee,Rectal.Bleeding,pos,2,1
+coffee,Stool.Frequency,pos,3,1
+corn,Rectal.Bleeding,pos,2,1
+cream,Stool.Frequency,pos,3,1
+cucumber,Rectal.Bleeding,pos,2,1
+duck,Stool.Frequency,pos,2,1
+egg chicken,Rectal.Bleeding,pos,2,1
+egg chicken,Stool.Frequency,pos,3,1
+fava bean,Stool.Frequency,pos,1,1
+feta cheese,Rectal.Bleeding,neg,2,1
+fish undetermined,Rectal.Bleeding,pos,2,1
+fish undetermined,Stool.Frequency,pos,3,1
+flax seed,Stool.Frequency,pos,1,1
+hazelnut,Stool.Frequency,pos,1,1
+herring,Rectal.Bleeding,pos,2,1
+herring,Stool.Frequency,pos,3,1
+kelp,Stool.Frequency,pos,1,1
+lamb,Rectal.Bleeding,pos,2,1
+lamb,Stool.Frequency,pos,3,1
+langostino,Rectal.Bleeding,pos,2,1
+langostino,Stool.Frequency,pos,2,1
+lentil,Rectal.Bleeding,pos,2,1
+lettuce,Rectal.Bleeding,pos,2,1
+lime,Stool.Frequency,pos,1,1
+lizard,Rectal.Bleeding,pos,2,1
+lizard,Stool.Frequency,pos,3,1
+mackerel,Rectal.Bleeding,pos,2,1
+mackerel,Stool.Frequency,pos,3,1
+mandarin,Rectal.Bleeding,pos,2,1
+mango,Stool.Frequency,pos,2,1
+meat undetermined,Stool.Frequency,pos,2,1
+melon,Stool.Frequency,pos,2,1
+milk,Rectal.Bleeding,pos,2,1
+milk,Stool.Frequency,pos,3,1
+milk cow,Rectal.Bleeding,pos,2,1
+milk cow,Stool.Frequency,pos,3,1
+millet,Stool.Frequency,pos,1,1
+mouse,Rectal.Bleeding,pos,2,1
+mouse,Stool.Frequency,pos,3,1
+mushroom,Stool.Frequency,pos,3,1
+oat,Rectal.Bleeding,pos,2,1
+oat,Stool.Frequency,pos,3,1
+olive,Rectal.Bleeding,neg,2,1
+onion,Rectal.Bleeding,pos,2,1
+onion,Stool.Frequency,pos,3,1
+orange,Rectal.Bleeding,pos,2,1
+orange,Stool.Frequency,pos,3,1
+parsley,Stool.Frequency,pos,1,1
+pea,Stool.Frequency,pos,1,1
+pear,Rectal.Bleeding,neg,2,1
+pecan,Stool.Frequency,pos,1,1
+pepper,Rectal.Bleeding,pos,2,1
+pig,Rectal.Bleeding,pos,2,1
+pig,Stool.Frequency,pos,3,1
+pine nut,Stool.Frequency,pos,2,1
+plum,Rectal.Bleeding,neg,1,1
+pumpkin,Stool.Frequency,pos,1,1
+pumpkin blossom,Rectal.Bleeding,neg,1,1
+quinoa,Rectal.Bleeding,pos,2,1
+quinoa,Stool.Frequency,pos,3,1
+rice,Rectal.Bleeding,pos,2,1
+rice,Stool.Frequency,pos,3,1
+rosemary,Rectal.Bleeding,neg,2,1
+rosemary,Stool.Frequency,neg,2,1
+sardine,Rectal.Bleeding,pos,2,1
+shrimp,Rectal.Bleeding,pos,2,1
+shrimp,Stool.Frequency,pos,3,1
+silkworm,Stool.Frequency,pos,1,1
+silversides,Rectal.Bleeding,pos,2,1
+silversides,Stool.Frequency,pos,3,1
+smelt,Rectal.Bleeding,pos,2,1
+smelt,Stool.Frequency,pos,3,1
+spice,Rectal.Bleeding,neg,2,1
+squid,Rectal.Bleeding,pos,2,1
+squid,Stool.Frequency,pos,3,1
+sumac,Rectal.Bleeding,neg,1,1
+sunflower,Stool.Frequency,pos,2,1
+tea,Rectal.Bleeding,pos,2,1
+tea,Stool.Frequency,pos,3,1
+trout,Rectal.Bleeding,pos,2,1
+trout,Stool.Frequency,pos,3,1
+veal,Rectal.Bleeding,pos,2,1
+veal,Stool.Frequency,pos,2,1
+walnut,Stool.Frequency,pos,3,1
+wheat,Rectal.Bleeding,pos,2,1
+wheat,Stool.Frequency,pos,3,1
+worm,Rectal.Bleeding,pos,2,1
+worm,Stool.Frequency,pos,3,1
+yeast,Stool.Frequency,pos,2,1
+yogurt cow,Rectal.Bleeding,pos,2,1
+yogurt cow,Stool.Frequency,pos,3,1
