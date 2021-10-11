@@ -1,0 +1,143 @@
+---
+title: "Global FoodOmics - IBD"
+subtitle: "Exploratory analysis of all datasets"
+author: "Kiana A West"
+date: "`r Sys.Date()`"
+params:
+  ibd_200: "../data/IBD_200.RDS"
+  ibd_1: "../data/IBD_1.RDS"
+  ibd_biospy: "../data/IBD_biopsy.RDS"
+  ibd_seed: "../data/IBD_seed.RDS"
+  ibd_seed2: "../data/IBD_seed2.RDS"
+  save_dir: "../output"
+output: 
+  html_document:
+    toc: true
+    theme: cerulean
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+***  
+Here we analyzed untargeted metabolomics data from 5 IBD cohorts to get an idea of variation in dietary patterns. Food counts (pseudo diet readouts) were generated from clinical samples according to the following (workflow)[https://ccms-ucsd.github.io/GNPSDocumentation/tutorials/rdd/].
+***   
+
+Make output directory
+
+```{r}
+if (!dir.exists(params$save_dir)) { system(paste("mkdir", params$save_dir)) }
+```
+
+Load packages
+
+```{r}
+pacman::p_load("phyloseq", "magrittr", "ggpubr", "plotly", "mixOmics", "tidyverse", "UpSetR")
+```
+
+Read in data
+
+```{r read_inputs}
+ibd_200 <- readRDS(params$ibd_200)
+ibd_1 <- readRDS(params$ibd_1)
+ibd_seed <- readRDS(params$ibd_seed)
+ibd_biopsy <- readRDS(params$ibd_biospy)
+ibd_seed2 <- readRDS(params$ibd_seed2)
+```
+
+Combine into one phyloseq object
+
+```{r}
+ps_all <- merge_phyloseq(ibd_200$ps, ibd_1$ps, ibd_seed$ps, ibd_biopsy$ps, ibd_seed2$ps)
+```
+
+Summary table
+
+```{r}
+sumtab <- data.frame(ps_all@sam_data, stringsAsFactors = FALSE) %>%
+  group_by(Cohort, Study.sub.group) %>%
+  dplyr::summarise(samples = n(),
+                   individuals = n_distinct(host_subject_id)) %>%
+  mutate(n = paste0(samples, " (", individuals, ")")) %>%
+  dplyr::select(-samples, -individuals) %>%
+  pivot_wider(names_from = "Study.sub.group", values_from = "n")
+write.csv(sumtab, file.path(params$save_dir, "dataset_summary_table.csv"))
+```
+
+```{r, echo=FALSE}
+knitr::kable(sumtab)
+```
+
+Note: `NA` samples are cases where metadata was missing.
+
+# PCA of all datasets
+
+```{r}
+f_counts_mat <- as(ps_all@otu_table, "matrix")
+clr_mat <- logratio.transfo(f_counts_mat, offset = 1, logratio = "CLR")
+m <- pca(clr_mat, 
+         ncomp = 3, center = T, scale = T)
+df <- data.frame(m$variates$X, filename = m$names$sample, total_sum = rowSums(f_counts_mat), 
+                 unique_foods = apply(f_counts_mat, 1, function(x) {sum(x > 0)}))
+df <- left_join(data.frame(sample_data(ps_all), stringsAsFactors = FALSE), df, by = "filename")
+df <- subset(df, !is.na(df$Study.sub.group))
+```
+
+Plot PCA scores
+
+```{r, plotly=TRUE}
+for (f in c("Cohort", "Study.sub.group")) {
+  p <- plot_ly(df, x = ~PC1, y = ~PC2, type = "scatter", mode = "markers", color = ~get(f),
+               colors = c("slategrey", "aquamarine2", "khaki", "darkgoldenrod", "brown"),
+               marker = list(size = 10, width = 2, line = list(color = "black", width = 2), opacity = 1),
+               text = ~filename) %>%
+    layout(title = str_replace_all(f, c("\\.x" = "", "\\.y" = "")),
+           xaxis = list(title = paste0("PC1", " [", round(m$prop_expl_var$X[1]*100, digits = 1), "%]"), size = 18),
+           yaxis = list(title = paste0("PC2", " [", round(m$prop_expl_var$X[2]*100, digits = 1), "%]"), size = 18))
+  ggplotly(p) # show plot in notebook
+  htmlwidgets::saveWidget(p, file = file.path(params$save_dir, paste0("PCA_food_counts_colorBY_", f, ".html")))
+}
+```
+
+# Most common foods found in fecal vs biopsy samples
+
+```{r}
+to_plot <- data.frame(ps_all@sam_data, stringsAsFactors = FALSE) %>%
+  dplyr::select(Cohort, ends_with("L5"))
+
+# most prevalent foods in each cohort
+prev <- to_plot %>%
+  group_by(Cohort) %>%
+  summarise_all(function(x) {sum(x > 0)/length(x)}) %>%
+  dplyr::select(-mouse_L5)
+
+top_foods <- names(sort(colSums(prev[,-1], na.rm = T), decreasing = T))[1:30]
+```
+ 
+Plot
+ 
+```{r, fig.align='center'}
+to_plot <- to_plot %>%
+  dplyr::select(Cohort, one_of(top_foods)) %>%
+  pivot_longer(-Cohort, names_to = "Food", values_to = "RelativeAbundance") %>%
+  mutate(Food = str_replace_all(Food, c("_L5" = "", "_" = " ")))
+(p <- ggviolin(to_plot, x = "Cohort", y = "RelativeAbundance", add = "jitter", 
+              add.params = list(color = "Cohort", alpha = 0.3), 
+              palette = c("slategrey", "aquamarine2", "khaki", "darkgoldenrod", "brown")) +
+  labs(y = "Relative Abundance") +
+  facet_wrap(. ~ Food, scales = "free_y") +
+  rotate_x_text(angle = 45) +
+  theme(axis.text = element_text(size = 6), legend.position = "none", strip.text = element_text(size = 8)))
+ggsave(filename = file.path(params$save_dir, "relative_abundances_most_prevalent_foods.pdf"), width = 8)
+```
+
+# Session Info
+
+```{r, echo=FALSE}
+sessionInfo()
+```
