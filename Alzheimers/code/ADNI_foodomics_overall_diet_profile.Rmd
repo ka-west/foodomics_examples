@@ -141,6 +141,11 @@ to_plot <- tibble(food = row.names(cor_mat$r)[-1], r = cor_mat$r[-1,"PC1"], p = 
 sig_foods <- subset(to_plot, p.adjust(to_plot$p, method = "BH") < 0.05 & abs(to_plot$r) > 0.2)
 ```
 
+```{r, echo=FALSE}
+# save the important foods for further analyses in another notebook
+write_csv(sig_foods, file.path(params$save_dir, "ADNI_imp_foods.csv"))
+```
+
 Plot all correlations at L3, L4, L5
 
 ```{r, fig.align='center'}
