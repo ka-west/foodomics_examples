@@ -1,0 +1,475 @@
+---
+title: "Global FoodOmics - U19 - ADNI"
+subtitle: "Exploratory Analysis"
+author: "Kiana A West"
+date: "`r Sys.Date()`"
+params:
+  ont_file: "../../foodomics_metadata_08APR21.tsv"
+  f_counts_file: "../data/ADNI_food_counts_noLevels.csv"
+  meta_file: "../data/ADNI_metadata_KAW.csv"
+  imp_var: "../data/ADNI_GO_Variables_Of_Importance.csv"
+  save_dir: "../output/ADNI"
+output: 
+  html_document:
+    toc: true
+    theme: cerulean
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+***  
+
+```{r, setup, include=FALSE}
+knitr::opts_chunk$set(fig.align = "center")
+```
+
+Make output directory
+
+```{r}
+if (!dir.exists(params$save_dir)) { system(paste("mkdir", params$save_dir)) }
+```
+
+Load packages
+
+```{r}
+pacman::p_load("plotly", "tidyverse", "phyloseq", "magrittr", "ggpubr", "jtools")
+```
+
+Read in files
+
+```{r read_inputs, message=FALSE}
+ont <- read_delim(params$ont_file, delim = "\t") %>%
+  filter(!duplicated(sample_name)) # two food samples with same name - keep one
+meta <- read_csv(params$meta_file) %>%
+  filter(RID != "RID999999") # remove non-clinical samples
+         # !duplicated(RID))
+f_counts <- read_csv(params$f_counts_file) %>%
+  filter(filename %in% meta$SampleID) # keep only samples with metadata
+imp_var <- read_csv(params$imp_var) # variables of interest
+```
+
+Format data
+
+```{r}
+f_counts_mat <- set_rownames(as(f_counts[,-1], "matrix"), f_counts$filename)
+
+ont <- set_rownames(as(ont, "matrix"), ont$sample_name)
+
+meta <- set_rownames(as.data.frame(meta), meta$SampleID)
+
+# merge data, metadata, ontology into one object
+ps <- phyloseq(otu_table(f_counts_mat, taxa_are_rows = FALSE),
+               tax_table(ont[,c("filename", "ontology_terminal_leaf", "sample_type_group1", "sample_type_group2", "sample_type_group3",
+                                "sample_type_group4", "sample_type_group5", "sample_type_group6")]),
+               # tax_table(ont[,c("sample_type_group4", "filename")]),
+               sample_data(meta))
+```
+
+Transform food counts at specific levels to proportions
+
+```{r, message=FALSE}
+transform_f_counts <- function(f) {
+  fc <- read_csv(f)
+  filenames <- fc$filename
+  fc <- fc %>%
+    dplyr::select(-filename) %>%
+    apply(., 1, function(x) {ifelse(x != 0, x/sum(x), 0)}) %>%
+    t() %>%
+    data.frame() %>%
+    set_rownames(make.names(filenames))
+  return(fc)
+}
+
+f_counts_L3 <- transform_f_counts("../data/ADNI_food_counts_L3.csv")
+f_counts_L3 <- f_counts_L3[row.names(f_counts_L3) %in% meta$SampleID,]
+f_counts_L4 <- transform_f_counts("../data/ADNI_food_counts_L4.csv")
+f_counts_L4 <- f_counts_L4[row.names(f_counts_L4) %in% meta$SampleID,]
+f_counts_L5 <- transform_f_counts("../data/ADNI_food_counts_L5.csv")
+f_counts_L5 <- f_counts_L5[row.names(f_counts_L5) %in% meta$SampleID,]
+```
+
+# PCA of food counts
+
+Model CLR transformed data (individual food counts i.e. no ontology level) to observe variation in diet across cohort.
+
+```{r}
+clr_mat <- mixOmics::logratio.transfo(f_counts_mat,
+                                      offset = 1, logratio = "CLR")
+m <- mixOmics::pca(clr_mat, 
+                   ncomp = 3, center = T, scale = T)
+# extract latent variables from model
+df <- data.frame(m$variates$X, filename = m$names$sample, total_sum = rowSums(f_counts_mat), 
+                 unique_foods = apply(f_counts_mat, 1, function(x) {sum(x > 0)}))
+# add proportional food counts at L3-L5
+df <- left_join(meta, df, by = c("SampleID" = "filename")) %>%
+  left_join(mutate(f_counts_L3, filename = row.names(f_counts_L3)), by = c("SampleID" = "filename")) %>%
+  left_join(mutate(f_counts_L4, filename = row.names(f_counts_L4)), by = c("SampleID" = "filename")) %>%
+  left_join(mutate(f_counts_L5, filename = row.names(f_counts_L5)), by = c("SampleID" = "filename"))
+```
+
+## Which food groups are correlated to PC1?
+
+Get categories at each ontology level (L3-L5)
+
+```{r}
+ont_levels <- ont %>%
+  data.frame() %>%
+  dplyr::select(sample_type_group3, sample_type_group4, sample_type_group5) %>%
+  gather(key = "ont_level", value = "food") %>%
+  arrange(desc(ont_level)) %>%
+  filter(food != "complex",
+         !duplicated(food)) %>%
+  mutate(food = make.names(food),
+         ont_level = gsub("sample_type_group", "L", ont_level))
+```
+
+Calculate Spearman correlations
+
+```{r}
+to_cor <- dplyr::select(df, PC1, dairy:yogurt_cow)
+# correlate whole matrix
+cor_mat <- Hmisc::rcorr(as(to_cor, "matrix"), type = "spearman")
+# keep PC1~each food
+to_plot <- tibble(food = row.names(cor_mat$r)[-1], r = cor_mat$r[-1,"PC1"], p = cor_mat$P[-1,"PC1"]) %>%
+  filter(!grepl("\\.x", food), # some foods are duplicated across ontology levels, keep lower level
+         !food %in% c("honey", "seaweed")) %>% # these foods are found at 3 different levels (removing L3)
+  arrange(r) %>%
+  mutate(orig_term = food,
+         food = as_factor(gsub("\\.y", "", food))) %>%
+  left_join(ont_levels) %>%
+  mutate(ont_level = factor(ont_level, levels = c("L3", "L4", "L5")))
+# keep foods whose corr with PC1 has FDR<0.05 & |corr|>0.2
+sig_foods <- subset(to_plot, p.adjust(to_plot$p, method = "BH") < 0.05 & abs(to_plot$r) > 0.2)
+```
+
+Plot all correlations at L3, L4, L5
+
+```{r, fig.align='center'}
+# L3/4 plot
+p1 <- ggbarplot(subset(to_plot, to_plot$ont_level != "L5"), x = "food", y = "r", 
+                fill = "ont_level", palette = c("#56B4E9", "#F0E442"),
+                facet.by = "ont_level", scales = "free_x") +
+  labs(y = "Spearman (r)", x = "Food", fill = "Ontology Level") +
+  rotate_x_text(angle = 90) +
+  geom_hline(yintercept = 0) +
+  theme(legend.position = "none",
+        axis.text = element_text(size = 7),
+        panel.grid.major.x = element_line(colour = "grey", size = 0.2, linetype = 2))
+# L5 plot
+p2 <- ggbarplot(subset(to_plot, to_plot$ont_level == "L5"), x = "food", y = "r", 
+                fill = "ont_level", palette = c("#009E73"),
+                facet.by = "ont_level", scales = "free_x") +
+  labs(y = "Spearman (r)", x = "Food", fill = "Ontology Level") +
+  rotate_x_text(angle = 90) +
+  geom_hline(yintercept = 0) +
+  theme(legend.position = "none",
+        axis.text = element_text(size = 7),
+        panel.grid.major.x = element_line(colour = "grey", size = 0.2, linetype = 2))
+(p <- ggarrange(p1, p2, nrow = 2))
+```
+
+```{r}
+ggsave(filename = paste0(params$save_dir, "correlations_between_PC1_food_categories.pdf"), plot = p, height = 7, width = 9)
+```
+
+## Plot PCA scores colored by each significant ontology category (L3-L5). 
+
+Saved as interactive html files
+
+```{r}
+for (f in c(sig_foods$orig_term,"AGE", "DX", "RAVLT_perc_forgetting_bl")) {
+  p <- plot_ly(df, x = ~PC1, y = ~PC2, type = "scatter", mode = "markers", color = ~get(f), #symbol = ~class,
+               marker = list(size = 10, width = 2, line = list(color = "black", width = 2))) %>%
+        layout(title = str_replace_all(f, c("\\.x" = "", "\\.y" = "")),
+               xaxis = list(title = paste0("PC1", " [", round(m$prop_expl_var$X[1]*100, digits = 1), "%]"), size = 18),
+               yaxis = list(title = paste0("PC2", " [", round(m$prop_expl_var$X[2]*100, digits = 1), "%]"), size = 18))
+  htmlwidgets::saveWidget(p, file = file.path(params$save_dir, paste0("PCA_CLR_allSamp_food_counts_colorBY_", f, ".html")))
+}
+```
+
+# Is diet variation related to metadata?
+
+Calculate linear mixed-effects models. Models 1-4 include multiple samples from some individuals and adjust for repeated measures. Models 5-6 include a single sample from each individual.   
+   
+1. All samples - adjust by RID - DX_bl
+2. All samples - adjust by RID - DX
+3. All samples - adjust by RID & plate - DX_bl
+4. All samples - adjust by RID & plate - DX
+5. Single sample - adjust by plate - DX_bl
+6. Single sample - adjust by plate - DX
+
+```{r}
+# all samples (for models 1-4)
+df1 <- df %>%
+  mutate(DX = factor(DX, levels = c("CN", "MCI", "Dementia")),
+         DX_bl = factor(DX_bl, levels = c("CN", "SMC", "EMCI", "LMCI", "AD")))
+# single sample per individual (for models 5-6)
+df2 <- df %>%
+  filter(!duplicated(RID)) %>%
+  mutate(DX = factor(DX, levels = c("CN", "MCI", "Dementia")),
+         DX_bl = factor(DX_bl, levels = c("CN", "SMC", "EMCI", "LMCI", "AD")))
+```
+
+Models 1-4 
+
+```{r}
+m1 <- lme4::lmer(PC1 ~ DX_bl + AGE + PTGENDER + RAVLT_perc_forgetting_bl + (1|Plate) + (1|RID),
+          data = df1)
+mres1 <- as.data.frame(anova(m1)) %>% # obtain sum of squares for fixed effects
+  set_colnames(make.names(colnames(.))) %>%
+  mutate(term = row.names(.),
+         var = 100*(Sum.Sq/sum(Sum.Sq))) # calculate % variance explained for each fixed effect
+
+m2 <- lme4::lmer(PC1 ~ DX + AGE + PTGENDER + RAVLT_perc_forgetting_bl + (1|Plate) + (1|RID),
+                 data = df1)
+mres2 <- as.data.frame(anova(m2)) %>%
+  set_colnames(make.names(colnames(.))) %>%
+  mutate(term = row.names(.),
+         var = 100*(Sum.Sq/sum(Sum.Sq)))
+
+m3 <- lme4::lmer(PC1 ~ DX_bl + AGE + PTGENDER + RAVLT_perc_forgetting_bl + (1|RID),
+                 data = df1)
+mres3 <- as.data.frame(anova(m3)) %>%
+  set_colnames(make.names(colnames(.))) %>%
+  mutate(term = row.names(.),
+         var = 100*(Sum.Sq/sum(Sum.Sq)))
+
+m4 <- lme4::lmer(PC1 ~ DX + AGE + PTGENDER + RAVLT_perc_forgetting_bl + (1|RID),
+                 data = df1)
+mres4 <- as.data.frame(anova(m4)) %>%
+  set_colnames(make.names(colnames(.))) %>%
+  mutate(term = row.names(.),
+         var = 100*(Sum.Sq/sum(Sum.Sq)))
+```
+
+Models 5-6
+
+```{r}
+m5 <- lme4::lmer(PC1 ~ DX_bl + AGE + PTGENDER + RAVLT_perc_forgetting_bl + (1|Plate),
+          data = df2)
+mres5 <- as.data.frame(anova(m5)) %>%
+  set_colnames(make.names(colnames(.))) %>%
+  mutate(term = row.names(.),
+         var = 100*(Sum.Sq/sum(Sum.Sq)))
+
+m6 <- lme4::lmer(PC1 ~ DX + AGE + PTGENDER + RAVLT_perc_forgetting_bl + (1|Plate),
+                 data = df2)
+mres6 <- as.data.frame(anova(m6)) %>%
+  set_colnames(make.names(colnames(.))) %>%
+  mutate(term = row.names(.),
+         var = 100*(Sum.Sq/sum(Sum.Sq)))
+```
+
+Plot effect sizes (DX_bl: m1, m3, m5)
+
+```{r}
+to_plot1 <- plot_summs(m1, scale = TRUE)$data %>% # get regression coefficients
+  mutate(group = plyr::mapvalues(x = term, # change variable labels for plot
+                                 from = term,
+                                 to = c("SMC", "EMCI", "LMCI", "AD",  "AGE", "GENDER", "PERC_FORGETTING")),
+         group = factor(group, levels = rev(unique(group))),
+         # need to re-group fixed effects (remove categories from label) to merge with sum.sq/%var data
+         # sum.sq/%var is calculated for each fixed effect rather than each category within the variable
+         # whereas regression coefficients are specific to each variable category (if non-numeric)
+         term = gsub("DX.*", "DX_bl", term),
+         Significance = ifelse(p.value < 0.05, "p<0.05", "p>0.05"),
+         model = "All samples - adj by RID & Plate") %>%
+  # add sum.sq/%var
+  full_join(mres1, by = "term")
+to_plot3 <- plot_summs(m3, scale = TRUE)$data %>%
+  mutate(group = plyr::mapvalues(x = term,
+                                 from = term,
+                                 to = c("SMC", "EMCI", "LMCI", "AD",  "AGE", "GENDER", "PERC_FORGETTING")),
+         group = factor(group, levels = rev(unique(group))),
+         term = gsub("DX.*", "DX_bl", term),
+         Significance = ifelse(p.value < 0.05, "p<0.05", "p>0.05"),
+         model = "All samples - adj by RID") %>%
+  full_join(mres3, by = "term")
+to_plot5 <- plot_summs(m5, scale = TRUE)$data %>%
+  mutate(group = plyr::mapvalues(x = term,
+                                 from = term,
+                                 to = c("SMC", "EMCI", "LMCI", "AD",  "AGE", "GENDER", "PERC_FORGETTING")),
+         group = factor(group, levels = rev(unique(group))),
+         term = gsub("DX.*", "DX_bl", term),
+         Significance = ifelse(p.value < 0.05, "p<0.05", "p>0.05"),
+         model = "Single sample - adj by Plate") %>%
+  full_join(mres5, by = "term")
+to_plot <- rbind(to_plot1, to_plot3, to_plot5)
+```
+
+```{r, fig.width=10}
+p <- ggplot(data = to_plot, 
+            aes(x = group, y = estimate, colour = Significance,
+                ymin = conf.low, ymax = conf.high,
+                size = var)) +
+  geom_errorbar(size = 0.5, width = 0.1, position = position_dodge(width=0.5), color = "black") +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.3, color = "lightgray") +
+  scale_color_manual(values = c("red", "grey")) +
+  coord_flip()+
+  theme_classic() +
+  labs(size = "Variance explained (%)",
+       x = "",
+       y = "Regression Coefficient")
+(p <- facet(p, "model"))
+ggsave(filename = file.path(params$save_dir, "lme_PC1_DXbl.pdf"), plot = p, height = 5, width = 10)
+```
+
+Plot effect sizes (DX: m2, m4, m6)
+
+```{r}
+to_plot2 <- plot_summs(m2, scale = TRUE)$data %>%
+  mutate(group = plyr::mapvalues(x = term,
+                                 from = term,
+                                 to = c("MCI", "Dementia",  "AGE", "GENDER", "PERC_FORGETTING")),
+         group = factor(group, levels = rev(unique(group))),
+         term = gsub("DX.*", "DX", term),
+         Significance = ifelse(p.value < 0.05, "p<0.05", "p>0.05"),
+         model = "All samples - adj by RID & Plate") %>%
+  full_join(mres2, by = "term")
+to_plot4 <- plot_summs(m4, scale = TRUE)$data %>%
+  mutate(group = plyr::mapvalues(x = term,
+                                 from = term,
+                                 to = c("MCI", "Dementia",  "AGE", "GENDER", "PERC_FORGETTING")),
+         group = factor(group, levels = rev(unique(group))),
+         term = gsub("DX.*", "DX", term),
+         Significance = ifelse(p.value < 0.05, "p<0.05", "p>0.05"),
+         model = "All samples - adj by RID") %>%
+  full_join(mres4, by = "term")
+to_plot6 <- plot_summs(m6, scale = TRUE)$data %>%
+  mutate(group = plyr::mapvalues(x = term,
+                                 from = term,
+                                 to = c("MCI", "Dementia",  "AGE", "GENDER", "PERC_FORGETTING")),
+         group = factor(group, levels = rev(unique(group))),
+         term = gsub("DX.*", "DX", term),
+         Significance = ifelse(p.value < 0.05, "p<0.05", "p>0.05"),
+         model = "Single sample - adj by Plate") %>%
+  full_join(mres6, by = "term")
+to_plot <- rbind(to_plot2, to_plot4, to_plot6)
+```
+
+```{r, fig.width=10}
+p <- ggplot(data = to_plot, 
+            aes(x = group, y = estimate, colour = Significance,
+                ymin = conf.low, ymax = conf.high,
+                size = var)) +
+  geom_errorbar(size = 0.5, width = 0.1, position = position_dodge(width=0.5), color = "black") +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.3, color = "lightgray") +
+  scale_color_manual(values = c("red", "grey")) +
+  coord_flip()+
+  theme_classic() +
+  labs(size = "Variance explained (%)",
+       x = "",
+       y = "Regression Coefficient")
+(p <- facet(p, "model"))
+ggsave(filename = file.path(params$save_dir, "lme_PC1_DX.pdf"), plot = p, height = 5, width = 10)
+```
+
+## Simplified model
+
+Best fit models were with a single sample per individual
+
+```{r}
+df1 <- df %>%
+  filter(!duplicated(RID)) %>%
+  mutate(DX = factor(DX, levels = c("CN", "MCI", "Dementia")),
+         DX_bl = factor(DX_bl, levels = c("CN", "SMC", "EMCI", "LMCI", "AD")))
+
+m1 <- lme4::lmer(PC1 ~ DX + AGE + PTGENDER + (1|Plate),
+          data = df1)
+mres1 <- as.data.frame(anova(m1)) %>%
+  set_colnames(make.names(colnames(.))) %>%
+  mutate(term = row.names(.),
+         var = 100*(Sum.Sq/sum(Sum.Sq)))
+
+to_plot1 <- plot_summs(m1, scale = TRUE)$data %>%
+  mutate(group = plyr::mapvalues(x = term,
+                                 from = term,
+                                 to = c("MCI", "AD",  "AGE", "GENDER")),
+         group = factor(group, levels = rev(unique(group))),
+         term = gsub("DX.*", "DX", term),
+         Significance = ifelse(p.value < 0.05, "p<0.05", "p>0.05"),
+         model = "PC1") %>%
+  full_join(mres1, by = "term")
+```
+
+```{r}
+(p <- ggplot(data = to_plot1, 
+            aes(x = group, y = estimate, colour = Significance,
+                ymin = conf.low, ymax = conf.high,
+                size = var)) +
+  geom_errorbar(size = 0.5, width = 0.1, position = position_dodge(width=0.5), color = "black") +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.3, color = "lightgray") +
+  scale_color_manual(values = c("red", "grey")) +
+  coord_flip()+
+  theme_classic() +
+  labs(size = "Variance explained (%)",
+       x = "",
+       y = "Regression Coefficient"))
+ggsave(filename = file.path(params$save_dir, "lme_PC1_DX_forMS.pdf"), plot = p, height = 4, width = 6)
+```
+
+## Check models with variables of interest
+
+Some of these are missing from the metadata we received
+
+```{r}
+imp_var$Variable
+```
+
+```{r}
+df1 <- df %>%
+  filter(!duplicated(RID)) %>%
+  mutate(DX_bl = factor(DX_bl, levels = c("CN", "SMC", "EMCI", "LMCI", "AD"))) 
+
+m1 <- lme4::lmer(PC1 ~ DX_bl + AGE + PTGENDER + PTEDUCAT + APOE4 + TAU + (1|Plate),
+          data = df1)
+mres1 <- as.data.frame(anova(m1)) %>%
+  set_colnames(make.names(colnames(.))) %>%
+  mutate(term = row.names(.),
+         var = 100*(Sum.Sq/sum(Sum.Sq)))
+
+to_plot1 <- plot_summs(m1, scale = TRUE)$data %>%
+  mutate(group = plyr::mapvalues(x = term,
+                                 from = term,
+                                 to = c("SMC" ,"EMCI","LMCI","AD","AGE","GENDER","EDUCATION","APOE4","TAU")),
+         group = factor(group, levels = rev(unique(group))),
+         term = gsub("DX_bl.*", "DX_bl", term),
+         Significance = ifelse(p.value < 0.05, "p<0.05", "p>0.05"),
+         model = "PC1") %>%
+  full_join(mres1, by = "term")
+```
+
+```{r}
+(p <- ggplot(data = to_plot1, 
+            aes(x = group, y = estimate, colour = Significance,
+                ymin = conf.low, ymax = conf.high,
+                size = var)) +
+  geom_errorbar(size = 0.5, width = 0.1, position = position_dodge(width=0.5), color = "black") +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.3, color = "lightgray") +
+  scale_color_manual(values = c("red", "grey")) +
+  coord_flip()+
+  theme_classic() +
+  labs(size = "Variance explained (%)",
+       x = "",
+       y = "Regression Coefficient"))
+ggsave(filename = file.path(params$save_dir, "lme_PC1_imp_var.pdf"), plot = p, height = 4, width = 6)
+```
+
+None of these are related to variations in overall diet profile. Look at associations with individual foods in next notebook.
+
+# Session Info
+
+```{r}
+sessionInfo()
+```
+
