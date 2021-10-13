@@ -1,0 +1,14 @@
+Variable,Description
+DX_bl,Baseline Diagnosis
+CMMED,Medications
+SPARE_AD,Spatial Pattern of Abnormalities for Recognition of Early AD score
+ADAS13,Alzheimer's Disease Assessment Scale 13
+AGE,Age at baseline
+PTGENDER,Sex
+PTEDUCAT,Education
+BIFAST,Overnight fast from midnight?
+APOE4,ApoE4
+TAU,Tau
+VSWEIGHT,1a. Weight
+VSHEIGHT,2a. Height
+ABETA142,Amyloid Beta 142
