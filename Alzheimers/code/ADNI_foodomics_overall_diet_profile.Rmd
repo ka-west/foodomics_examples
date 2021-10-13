@@ -38,7 +38,7 @@ if (!dir.exists(params$save_dir)) { system(paste("mkdir", params$save_dir)) }
 Load packages
 
 ```{r}
-pacman::p_load("plotly", "tidyverse", "phyloseq", "magrittr", "ggpubr", "jtools")
+pacman::p_load("plotly", "tidyverse", "magrittr", "ggpubr", "jtools")
 ```
 
 Read in files
@@ -62,13 +62,6 @@ f_counts_mat <- set_rownames(as(f_counts[,-1], "matrix"), f_counts$filename)
 ont <- set_rownames(as(ont, "matrix"), ont$sample_name)
 
 meta <- set_rownames(as.data.frame(meta), meta$SampleID)
-
-# merge data, metadata, ontology into one object
-ps <- phyloseq(otu_table(f_counts_mat, taxa_are_rows = FALSE),
-               tax_table(ont[,c("filename", "ontology_terminal_leaf", "sample_type_group1", "sample_type_group2", "sample_type_group3",
-                                "sample_type_group4", "sample_type_group5", "sample_type_group6")]),
-               # tax_table(ont[,c("sample_type_group4", "filename")]),
-               sample_data(meta))
 ```
 
 Transform food counts at specific levels to proportions
@@ -175,7 +168,7 @@ p2 <- ggbarplot(subset(to_plot, to_plot$ont_level == "L5"), x = "food", y = "r",
 ```
 
 ```{r}
-ggsave(filename = paste0(params$save_dir, "correlations_between_PC1_food_categories.pdf"), plot = p, height = 7, width = 9)
+ggsave(filename = file.path(params$save_dir, "correlations_between_PC1_food_categories.pdf"), plot = p, height = 7, width = 9)
 ```
 
 ## Plot PCA scores colored by each significant ontology category (L3-L5). 
