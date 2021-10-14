@@ -1,0 +1,25 @@
+filename,mb_sample_id,Sample_name,time_point
+GItube_RawData_CSHpos_QC_01.mzML,SA167125,QC_01,QC
+GItube_RawData_CSHpos_QC_02.mzML,SA167127,QC_02,QC
+GItube_RawData_CSHpos_QC_03.mzML,SA167126,QC_03,QC
+GItube_RawData_CSHpos_QC_04.mzML,SA167128,QC_04,QC
+GItube_RawData_CSHpos_Sa_01.mzML,SA167129,Sa_01,Time point 1
+GItube_RawData_CSHpos_Sa_10.mzML,SA167130,Sa_10,Time point 10
+GItube_RawData_CSHpos_Sa_11.mzML,SA167131,Sa_11,Time point 11
+GItube_RawData_CSHpos_Sa_12.mzML,SA167132,Sa_12,Time point 12
+GItube_RawData_CSHpos_Sa_13.mzML,SA167133,Sa_13,Time point 13
+GItube_RawData_CSHpos_Sa_14.mzML,SA167134,Sa_14,Time point 14
+GItube_RawData_CSHpos_Sa_15.mzML,SA167135,Sa_15,Time point 15
+GItube_RawData_CSHpos_Sa_16.mzML,SA167136,Sa_16,Time point 16
+GItube_RawData_CSHpos_Sa_17.mzML,SA167137,Sa_17,Time point 17
+GItube_RawData_CSHpos_Sa_18.mzML,SA167138,Sa_18,Time point 18
+GItube_RawData_CSHpos_Sa_19.mzML,SA167139,Sa_19,Time point 19
+GItube_RawData_CSHpos_Sa_02.mzML,SA167140,Sa_02,Time point 2
+GItube_RawData_CSHpos_Sa_20.mzML,SA167141,Sa_20,Time point 20
+GItube_RawData_CSHpos_Sa_03.mzML,SA167142,Sa_03,Time point 3
+GItube_RawData_CSHpos_Sa_04.mzML,SA167143,Sa_04,Time point 4
+GItube_RawData_CSHpos_Sa_05.mzML,SA167144,Sa_05,Time point 5
+GItube_RawData_CSHpos_Sa_06.mzML,SA167145,Sa_06,Time point 6
+GItube_RawData_CSHpos_Sa_07.mzML,SA167146,Sa_07,Time point 7
+GItube_RawData_CSHpos_Sa_08.mzML,SA167147,Sa_08,Time point 8
+GItube_RawData_CSHpos_Sa_09.mzML,SA167148,Sa_09,Time point 9
