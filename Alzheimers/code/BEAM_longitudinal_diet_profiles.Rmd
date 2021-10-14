@@ -1,0 +1,172 @@
+---
+title: "Global FoodOmics - U19"
+subtitle: "BEAM cross-over diet: changes in diet profiles (L4 & L5) over time"
+author: "Kiana A West"
+date: "`r Sys.Date()`"
+params:
+  ont_file: "../../foodomics_metadata_08APR21.tsv"
+  f_counts_dir: "../data"
+  f_counts_name: "BEAM_.*_L4|BEAM_.*_L5"
+  meta_file: "../data/BEAM_metadata_KAW.csv"
+  save_dir: "../output/BEAM"
+output: 
+  html_document:
+    toc: true
+    theme: cerulean
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+***  
+
+Participants completed one diet (Keto or American Heart Association - AHA), did a wash-out, then switched to the other diet. We wanted to see if the diet readout reflects this.
+
+***   
+   
+Make output directory
+
+```{r}
+if (!dir.exists(params$save_dir)) { system(paste("mkdir", params$save_dir)) }
+```
+
+Load packages
+
+```{r}
+pacman::p_load("magrittr", "ggpubr", "mixOmics", "santaR", "tidyverse")
+```
+
+Read in files
+
+```{r read_inputs, message=FALSE}
+ont <- read_delim(params$ont_file, delim = "\t") %>%
+  filter(!duplicated(sample_name)) # two food samples have the same name "mackerel_gonad_13"
+meta <- read_csv(params$meta_file)
+# get files matching string provided
+f_counts_files <- list.files(params$f_counts_dir, pattern = params$f_counts_name)
+for (f in f_counts_files) {
+  assign(gsub("\\.csv", "", f), read.csv(file.path(params$f_counts_dir, f), row.names = 1))
+}
+```
+
+Format data
+
+```{r}
+ont <- set_rownames(as(ont, "matrix"), ont$sample_name)
+meta <- set_rownames(as.data.frame(meta), meta$filename)
+```
+
+Transform food counts to proportions
+
+```{r}
+transform_f_counts <- function(fc) {
+  filenames <- row.names(fc)
+  fc <- fc %>%
+    apply(., 1, function(x) {ifelse(x != 0, x/sum(x), 0)}) %>%
+    t() %>%
+    data.frame() %>%
+    mutate(filename = filenames) %>%
+    left_join(meta, by = "filename")
+  return(fc)
+}
+
+for (f in grep("^BEAM_.*food_counts", ls(), value = TRUE)) {
+  transf <- transform_f_counts(get(f))
+  assign(paste0("prop_", f), transf)
+}
+```
+
+Transform food counts using centered log-ratio (CLR)
+
+```{r}
+for (f in grep("^BEAM_.*food_counts", ls(), value = TRUE)) {
+  transf <- logratio.transfo(get(f), logratio = "CLR", offset = 1) %>%
+    as("matrix") %>%
+    data.frame() %>%
+    rownames_to_column(var = "filename") %>%
+    left_join(meta, by = "filename")
+  assign(paste0("clr_", f), transf)
+}
+```
+
+# Can we see longitudinal changes in diet profiles?
+
+Time series analysis on individual foods using spline-fitting method implemented in [santaR](https://cran.r-project.org/web/packages/santaR/santaR.pdf)
+
+```{r, spline_fit, message=FALSE, warning=FALSE}
+# get levels used from environment
+levs <- grep("food_counts_L", ls(), value = TRUE) %>%
+  gsub(".*food_counts_", "", .) %>%
+  unique()
+for (transf in c("prop", "clr")) { # analyze both transformations
+  for (lev in levs) { # and all levels provided
+    for (biosp in c("fecal", "serum")) { # and both biospecimen types
+      df <- get(paste0(transf, "_BEAM_", biosp, "_food_counts_", lev))
+      # keep patients with at least 4 time points
+      keep <- names(which(table(df$SubjectID) > 3))
+      df <- df %>%
+        filter(First.Diet %in% c("1", "2"),
+               SubjectID %in% keep)
+      foods <- colnames(get(paste0("BEAM_", biosp, "_food_counts_", lev)))
+      sp <- santaR_auto_fit(inputData = df[,foods], ind = df[["SubjectID"]], 
+                            time = as.numeric(df[["Study_TP"]]), group = df[["First.Diet"]], 
+                            df = 4)
+      assign(paste("sp", transf, lev, biosp, sep = "_"), sp)
+    }
+  }
+}
+```
+
+Plot mean spline for each group for each food
+
+```{r}
+plot_spline <- function(sp, savename) {
+  foods <- names(sp)
+  # get BH-corrected pvalues
+  pvals <- santaR_auto_summary(sp)$pval.all %>%
+    mutate(food = row.names(.))
+  for (f in 1:length(foods)) {
+    food <- foods[f]
+    pval <- round(pvals$dist_BH[pvals$food == food], digits = 4)
+    # plot group mean splines with confidence intervals
+    p <- santaR_plot(sp[[food]], 
+                     showIndPoint=FALSE,
+                     showIndCurve=FALSE,
+                     xlab = "Time point", 
+                     ylab = ifelse(grepl("clr", savename), "CLR(food count)", "Food abundance (%)"), 
+                     title = paste(food, paste0("(FDR=", pval, ")")),
+                     colorVect = c("orange", "dodgerblue")) +
+      scale_x_continuous(labels = c("1" = "1: Pre-diet 1", "2" = "2: Diet 1", "3" = "3: Post-diet 1/Pre-diet 2", 
+                                    "4" = "4: Diet 2", "5" = "5: Post-diet 2")) +
+      rotate_x_text(angle = 45) +
+      theme(axis.text = element_text(size = 5),
+            panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(), 
+            title = element_text(size = 7)) 
+    ggsave(file.path(params$save_dir, paste0("BEAM_time_series_plot_", savename, "_", food, ".pdf")), 
+           p, width = 4, height = 3)
+    # if p<0.05, show plot in notebook
+    if (pvals$dist[pvals$food == food]<0.05) { print(p) }
+  }
+}
+```
+
+Plot will be displayed if `P<0.05`, even if not significant after adjusting for multiple hypothesis tests. `Group 1` started with Keto diet, `Group 2` started with AHA diet.
+
+```{r, fig.align='center'}
+for (sp in grep("sp_", ls(), value = TRUE)) {
+  obj <- get(sp)
+  suppressMessages(plot_spline(obj, gsub("sp_", "", sp)))
+}
+```
+
+# Session Info
+
+```{r}
+sessionInfo()
+```
