@@ -1,0 +1,113 @@
+---
+title: "Global FoodOmics - GI Tube dataset"
+author: "Kiana A West"
+date: "`r Sys.Date()`"
+params:
+  metadata: "../data/ST001794_GI_tube_dataset_metadata.csv"
+  foods: "../data/GI_tube_food_consumption.csv"
+  f_counts: "../data/GI_tube_food_counts_L5.csv"
+  save_dir: "../output/GI_Tube"
+output: 
+  html_document:
+    toc: true
+    theme: cerulean
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+***  
+
+This data was collected from the small intestine of a single person over ~8 hours. Foods consumed during the study are listed below.
+
+```{r, echo=FALSE}
+options(stringsAsFactors = FALSE)
+```
+
+Make output directory
+
+```{r}
+if (!dir.exists(params$save_dir)) { system(paste("mkdir", params$save_dir)) }
+```
+
+Load packages
+
+```{r}
+pacman::p_load("magrittr", "ggpubr", "tidyverse")
+```
+
+Read in (meta)data
+
+```{r, message=FALSE}
+metadata <- read_csv(params$metadata)
+f_counts <- read_csv(params$f_counts)
+foods <- read_csv(params$foods)
+```
+
+Foods consumed during the study
+
+```{r, echo=FALSE}
+knitr::kable(foods)
+foods$`Sampling Time` <- str_replace_all(foods$`Sampling Time`, c(":00$" = "", ":" = ".")) %>%
+  as.numeric() %>%
+  round(digits = 2)
+```
+
+Transform counts to proportions
+
+```{r}
+f_counts_norm <- f_counts %>%
+  dplyr::select(-filename) %>%
+  apply(1, function(x) {ifelse(x != 0, (x/sum(x))*100, 0)}) %>%
+  t() %>%
+  data.frame() %>%
+  mutate(filename = f_counts$filename)
+```
+
+Foods to plot
+
+```{r}
+gfop_foods <- c("apple", "coffee", "pear", "peach", "pumpkin", "cinnamon", "olive", "wheat", "yogurt_cow")
+```
+
+Merge data and metadata
+
+```{r}
+to_plot <- f_counts_norm %>%
+  select(one_of(gfop_foods, "filename")) %>%
+  left_join(metadata) %>%
+  mutate(time_point = as.numeric(gsub("Time point ", "", time_point))) %>%
+  left_join(foods, by = c("time_point" = "Sample Number")) %>%
+  pivot_longer(all_of(gfop_foods), names_to = "food", values_to = "proportion")
+```
+
+Plot
+
+```{r, fig.align='center'}
+(p <- ggline(to_plot, x = "Sampling Time", y = "proportion", group = "food", color = "food",
+             ylab = "Proportion of spectral matches (%)", numeric.x.axis = TRUE) +
+   theme(axis.text = element_text(size = 7)) +
+   # manually add times foods were eaten on the plot
+   annotate(geom = "text", x = 9.35, y = 7.6, label = "apple juice, coffee", size = 2.5, angle = 90) +
+   annotate(geom = "text", x = 10.45, y = 7.6, label = "puree", size = 2.5, angle = 90) +
+   annotate(geom = "text", x = 10.55, y = 7.6, label = "puree", size = 2.5, angle = 90) +
+   annotate(geom = "text", x = 12.10, y = 7.6, label = "olive oil, bread, coffee", size = 2.5, angle = 90) +
+   annotate(geom = "text", x = 14.15, y = 7.6, label = "cereal, coffee", size = 2.5, angle = 90) +
+   annotate(geom = "text", x = 16.35, y = 7.6, label = "kefir", size = 2.5, angle = 90))
+```
+
+```{r}
+ggsave(filename = file.path(params$save_dir, "GI_tube_time_series.pdf"), plot = p)
+```
+
+## Session Info
+
+```{r, echo=FALSE}
+sessionInfo()
+```
+

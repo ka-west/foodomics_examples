@@ -1,0 +1,21 @@
+Sample Number,Sampling Time,Sample pH,Sampling Depth (cm past pylorus),Oil layer formed on top of sample,Food and Drink
+1,10:15,1,0,No,"water, apple juice, espresso at 9:35"
+2,10:27,1.6,0,No,
+3,10:40,8.1,10,No,
+4,10:50,6.6,30,No,"60 grams of puree (pear, peach, pumpkin, apple, cinnamon) at 10:45"
+5,11:10,5,70,No,500 mg acetaminophen and 30 grams puree as above at 10:55
+6,11:30,6.1,85,No,
+7,12:00,6.4,125,No,
+8,12:30,6.3,125,Yes,"20 grams olive oil, 20 grams white bread, espresso at 12:10"
+9,13:00,6.7,125,Yes,
+10,13:30,6.4,125,No,
+11,14:00,6.3,125,No,
+12,14:30,6.8,125,No,"25 grams whole wheat cereal with water, espresso at 14:15"
+13,15:00,6.8,125,No,
+14,15:30,6.2,125,Yes,
+15,16:00,6.4,125,Yes,
+16,16:30,6.3,125,No,
+17,17:00,6.6,125,No,210 grams fermented milk (kefir) at 16:35
+18,17:30,6.4,125,No,
+19,18:00,6.8,125,No,
+20,18:30,6.7,125,No,
