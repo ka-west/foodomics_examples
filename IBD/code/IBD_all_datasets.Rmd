@@ -25,7 +25,7 @@ output:
 </style>
 
 ***  
-Here we analyzed untargeted metabolomics data from 5 IBD cohorts to get an idea of variation in dietary patterns. Food counts (pseudo diet readouts) were generated from clinical samples according to the following (workflow)[https://ccms-ucsd.github.io/GNPSDocumentation/tutorials/rdd/].
+Here we analyzed untargeted metabolomics data from 5 IBD cohorts to get an idea of variation in dietary patterns. Food counts (pseudo diet readouts) were generated from clinical samples according to the following [workflow](https://ccms-ucsd.github.io/GNPSDocumentation/tutorials/rdd/).   
 ***   
 
 Make output directory
